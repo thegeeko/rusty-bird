@@ -35,17 +35,19 @@ impl Wall {
 		Wall {
 			x,
 			gap_center: random.range(10, 40),
-			gap_size: i32::max(4, 20 - score),
+			gap_size: i32::max(4, 20 - score), // make it harder as the scores goes up
 		}
 	}
 	fn render(&mut self, ctx: &mut BTerm, player_x: i32) {
 		let screen_x = self.x - player_x;
 		let half_size = self.gap_size / 2;
 
+		//draw from the top
 		for y in 0..self.gap_center - half_size {
 			ctx.set(screen_x, y, RED, BLACK, to_cp437('|'))
 		}
 
+		//draw from the bottom
 		for y in self.gap_center + half_size..SCREEN_HEIGHT {
 			ctx.set(screen_x, y, RED, BLACK, to_cp437('|'))
 		}
@@ -54,6 +56,7 @@ impl Wall {
 		let half_size = self.gap_size / 2;
 
 		if player.x == self.x {
+			//check if player above or below the gap
 			return player.y < (self.gap_center - half_size) || player.y > (self.gap_center + half_size);
 		} else {
 			return false;
@@ -78,6 +81,7 @@ impl Player {
 		}
 		self.y += self.velocity as i32;
 		if self.y < 0 {
+			// cap the player on the top
 			self.y = 0
 		}
 		self.x += 1;
@@ -110,6 +114,7 @@ impl State {
 		ctx.print(0, 2, &format!("Score : {}", self.score));
 		self.frame_time += ctx.frame_time_ms;
 		if self.frame_time > FRAME_DURATION {
+			// limit the time the function called to 1000/FRAME_DURATION
 			self.player.gravity_movement();
 			self.frame_time = 0.0
 		}
@@ -120,7 +125,7 @@ impl State {
 		self.wall.render(ctx, self.player.x);
 		if self.player.x > self.wall.x {
 			self.score += 1;
-			self.wall = Wall::new(SCREEN_WIDTH + self.player.x, self.score);
+			self.wall = Wall::new(SCREEN_WIDTH + self.player.x, self.score); // replace the old wall
 		}
 
 		if self.player.y > SCREEN_HEIGHT || self.wall.hit_wall(&self.player) {
