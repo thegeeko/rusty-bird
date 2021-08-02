@@ -2,7 +2,7 @@ use bracket_lib::prelude::*;
 
 const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 50;
-const FRAME_DURATION: f32 = 75.0;
+const FRAME_DURATION: f32 = 30.00;
 enum GameMode {
 	Menu,
 	Playing,
@@ -13,12 +13,52 @@ struct State {
 	mode: GameMode,
 	player: Player,
 	frame_time: f32,
+	wall: Wall,
+	score: i32,
 }
 
 struct Player {
 	x: i32,
 	y: i32,
 	velocity: f32,
+}
+
+struct Wall {
+	x: i32,
+	gap_center: i32,
+	gap_size: i32,
+}
+
+impl Wall {
+	fn new(x: i32, score: i32) -> Self {
+		let mut random = RandomNumberGenerator::new();
+		Wall {
+			x,
+			gap_center: random.range(10, 40),
+			gap_size: i32::max(4, 20 - score),
+		}
+	}
+	fn render(&mut self, ctx: &mut BTerm, player_x: i32) {
+		let screen_x = self.x - player_x;
+		let half_size = self.gap_size / 2;
+
+		for y in 0..self.gap_center - half_size {
+			ctx.set(screen_x, y, RED, BLACK, to_cp437('|'))
+		}
+
+		for y in self.gap_center + half_size..SCREEN_HEIGHT {
+			ctx.set(screen_x, y, RED, BLACK, to_cp437('|'))
+		}
+	}
+	fn hit_wall(&self, player: &Player) -> bool {
+		let half_size = self.gap_size / 2;
+
+		if player.x == self.x {
+			return player.y < (self.gap_center - half_size) || player.y > (self.gap_center + half_size);
+		} else {
+			return false;
+		}
+	}
 }
 
 impl Player {
@@ -30,7 +70,7 @@ impl Player {
 		}
 	}
 	fn render(&mut self, ctx: &mut BTerm) {
-		ctx.set(self.x, self.y, YELLOW, BLACK, to_cp437('@'))
+		ctx.set(0, self.y, YELLOW, BLACK, to_cp437('@'))
 	}
 	fn gravity_movement(&mut self) {
 		if self.velocity < 2.0 {
@@ -53,16 +93,21 @@ impl State {
 			player: Player::new(5, 25),
 			frame_time: 0.0,
 			mode: GameMode::Menu,
+			wall: Wall::new(SCREEN_WIDTH, 0),
+			score: 0,
 		}
 	}
 	fn restart(&mut self) {
 		self.player = Player::new(5, 25);
 		self.frame_time = 0.0;
 		self.mode = GameMode::Playing;
+		self.score = 0;
+		self.wall = Wall::new(SCREEN_WIDTH, 0)
 	}
 	fn play(&mut self, ctx: &mut BTerm) {
 		ctx.cls_bg(NAVY);
 		ctx.print(0, 0, "Press Space to flap");
+		ctx.print(0, 2, &format!("Score : {}", self.score));
 		self.frame_time += ctx.frame_time_ms;
 		if self.frame_time > FRAME_DURATION {
 			self.player.gravity_movement();
@@ -72,7 +117,13 @@ impl State {
 			self.player.flap()
 		}
 		self.player.render(ctx);
-		if self.player.y > SCREEN_HEIGHT {
+		self.wall.render(ctx, self.player.x);
+		if self.player.x > self.wall.x {
+			self.score += 1;
+			self.wall = Wall::new(SCREEN_WIDTH + self.player.x, self.score);
+		}
+
+		if self.player.y > SCREEN_HEIGHT || self.wall.hit_wall(&self.player) {
 			self.mode = GameMode::End;
 		}
 	}
@@ -90,7 +141,7 @@ impl State {
 		}
 	}
 	fn dead(&mut self, ctx: &mut BTerm) {
-		ctx.print_centered(5, "NT, Wanna try again ?");
+		ctx.print_centered(5, format!("NT, {} Wanna try again ?", self.score));
 		ctx.print_centered(8, "(P) let's go");
 		ctx.print_centered(10, "(Q) nah");
 
