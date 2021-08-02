@@ -1,5 +1,8 @@
 use bracket_lib::prelude::*;
 
+const SCREEN_WIDTH: i32 = 80;
+const SCREEN_HEIGHT: i32 = 50;
+const FRAME_DURATION: f32 = 75.0;
 enum GameMode {
 	Menu,
 	Playing,
@@ -27,14 +30,14 @@ impl Player {
 		}
 	}
 	fn render(&mut self, ctx: &mut BTerm) {
-		ctx.set(0, self.y, YELLOW, BLACK, to_cp437('@'))
+		ctx.set(self.x, self.y, YELLOW, BLACK, to_cp437('@'))
 	}
 	fn gravity_movement(&mut self) {
-		if (self.velocity < 2.0) {
+		if self.velocity < 2.0 {
 			self.velocity += 0.2;
 		}
 		self.y += self.velocity as i32;
-		if (self.y < 0) {
+		if self.y < 0 {
 			self.y = 0
 		}
 		self.x += 1;
@@ -53,10 +56,25 @@ impl State {
 		}
 	}
 	fn restart(&mut self) {
+		self.player = Player::new(5, 25);
+		self.frame_time = 0.0;
 		self.mode = GameMode::Playing;
 	}
 	fn play(&mut self, ctx: &mut BTerm) {
-		self.mode = GameMode::End;
+		ctx.cls_bg(NAVY);
+		ctx.print(0, 0, "Press Space to flap");
+		self.frame_time += ctx.frame_time_ms;
+		if self.frame_time > FRAME_DURATION {
+			self.player.gravity_movement();
+			self.frame_time = 0.0
+		}
+		if let Some(VirtualKeyCode::Space) = ctx.key {
+			self.player.flap()
+		}
+		self.player.render(ctx);
+		if self.player.y > SCREEN_HEIGHT {
+			self.mode = GameMode::End;
+		}
 	}
 	fn main_menu(&mut self, ctx: &mut BTerm) {
 		ctx.print_centered(5, "Welcome to Rusty bird");
